@@ -1,0 +1,287 @@
+/*
+ * CS350: HW8
+ *
+ * shuttle synch
+ *
+ * Author: Megan Horan(mrhoran@bu.edu)
+ * 
+ */
+
+import java.util.concurrent.Semaphore;
+import java.util.Random;
+
+class ShuttleSynch extends Thread
+{
+    private int id;
+    
+    private String type;
+   
+    static int riders = 50;
+    
+    static int K = 6;
+    
+    static int N = 10; // number of riders allowed on each shuttle
+    
+    volatile int available = N; // number of spots left on the shuttle
+    
+    static int THIS_STOP = -1;
+    static int NEXT_STOP = 0;
+    
+    static int random_stop;
+    static int next_stop;
+    
+    // these are the semaphore arrays to coordinate the different floors
+   
+    static Semaphore [] waiting = new Semaphore[K]; 
+    
+    static Semaphore [] riding = new Semaphore[K]; 
+    
+    // they will both all initilized to 0 to allow residents to wait to be picked up by the shuttle or wait to arrive at a stop
+    
+    // these two arrays specify who is waiting on what floor and who is riding
+    
+    static int [] waitingCounts = new int [N]; 
+    
+    static int [] ridingCounts = new int [N];
+    
+    // these are two mutexies to ensure mutual exclusion of the waitingCounts and ridingCounts array (initlized to 1) 
+    
+    static Semaphore mutex_wait = new Semaphore(1, false);
+    
+    static Semaphore mutex_ride = new Semaphore(1, false);
+    
+    
+    static Semaphore mutex_shuttle = new Semaphore(1, false);
+    
+    static Semaphore door = new Semaphore(0, false); 
+    
+    public ShuttleSynch(int i, String t)
+    {
+        id = i;
+        type = t;
+    }
+
+    public int min(int x, int y){
+        
+        if(x < y)
+            
+            return x;
+        
+        else
+            return y;
+    }
+    public void run()
+    {
+        try {
+            
+           
+        // shuttle thread
+        if(this.type == "shuttle"){
+           
+            int count = 0;
+            
+            while(true){
+                
+                //wait on riding shuttle and the waiting shuttle
+                mutex_wait.acquire();
+                mutex_ride.acquire();
+                
+                //mutex_shuttle.acquire();
+                
+                count++;
+                
+                // go to each stop in order
+                NEXT_STOP = ((THIS_STOP +1) % K);
+                
+                // check if there are people waiting
+//                
+//                for(int j = 0; j < N; j++){
+//                    
+//                    if(NEXT_STOP == j && waitingCounts[j] >= 1) // if there are people waiting on the floor
+//                        
+//                        break;
+//                    
+//                    else if(waitingCounts[j] >= 1){ // find the next stop with people waiting
+//                        
+//                        NEXT_STOP = j;
+//                        
+//                    }
+//                    
+//                }
+//                
+                //ride for a bit:
+                
+                sleep((int) Math.random() * 3000);
+                
+                THIS_STOP = NEXT_STOP;
+                
+                System.out.println("Shuttle is now going to stop " + THIS_STOP);
+                
+                // mutex around this code ie no people can get on past this point(cant rush aboard)
+                //waiting[THIS_FLOOR].acquire();
+                
+            // if there are no riders just shut the door
+                
+                
+                int count1 = 0;
+                
+                //**open the door
+                System.out.println("opening the door");
+                
+                
+                if(ridingCounts[THIS_STOP] == 0){
+                    
+                    System.out.println("Door is shutting");
+                    
+               }
+                
+                // let people walk out if there is room 
+                for(int m = 0; m < ridingCounts[THIS_STOP]; m++){
+                    
+                    riding[THIS_STOP].release();
+                
+                    System.out.println("A rider is leaving the shuttle at stop " + THIS_STOP);
+                    available++;
+                    count1++;
+                }
+                
+                
+                // let people walk on if there is availible space
+                
+                // see how much space we need, ie the smaller of these two 
+                
+                int n = min(waitingCounts[THIS_STOP], available);
+                
+                //System.err.println("Shuttle let out "+ count1 +" people");
+                
+                for(int k = 0; k < n; k++){
+                    
+                    // release waiting floor mutex
+                    waiting[THIS_STOP].release();
+                    
+                    available--;
+                   
+                    
+                }
+                 //**close the door
+                
+                door.release();
+                
+                //mutex_shuttle.release();
+             
+                mutex_wait.release();
+                mutex_ride.release();
+               
+                sleep(2000);
+
+               // keep repeating
+               
+            }
+          
+        }
+            
+    // rider thread
+
+        else if(this.type == "rider"){
+    
+                  //choose thisFloor at random
+            
+                mutex_wait.acquire();
+                
+                random_stop = (int)(Math.random() * K + 0);
+                
+                System.out.println("Rider" + this.id + " waiting at stop " + random_stop);
+                
+                waitingCounts[random_stop]++;
+                 
+                mutex_wait.release();
+                
+                // wait on the the semaphore for that floor
+                waiting[random_stop].acquire();
+                
+                System.out.println("Rider" + this.id + " got to their stop and is now on the shuttle.");
+                
+                 // elevator got to my floor and let me in
+                
+                mutex_wait.acquire();
+                
+                waitingCounts[random_stop]--;// no longer waiting
+   
+                mutex_ride.acquire();
+                
+                
+                
+                // choose nextFloor;
+                 
+                next_stop = (int)(Math. random() * K + 0);
+                
+                ridingCounts[next_stop]++;
+                 
+                System.out.println("Rider" + this.id + " selected stop " + next_stop+ " as their destination and is now riding");
+                
+                
+                if(waitingCounts[random_stop] == 0){
+                    
+                    door.acquire();
+                    
+                    System.out.println("Door is shutting");
+                    
+                    
+               }
+                
+                mutex_ride.release();
+                mutex_wait.release();
+                
+                riding[next_stop].acquire();
+                
+                // elevator got to nextFloor and released me
+                
+                System.out.println("Rider" + this.id + " got to their next floor " + THIS_STOP+ " and was released");
+                
+                mutex_ride.acquire();
+                
+                ridingCounts[next_stop]--;
+               
+                mutex_ride.release();
+                
+                random_stop = next_stop;
+                
+            }
+        
+        }catch(InterruptedException e) {
+                
+                System.out.println(e);
+            }
+    }
+    
+   public static void main(String[] args)
+    {
+        
+         
+        ShuttleSynch[] p = new ShuttleSynch[riders];
+        
+        for(int j = 0; j < K; j++){
+        
+            waiting[j] = new Semaphore(0, false);
+            riding[j] = new Semaphore(0, false);
+         
+        }
+    
+        
+        for (int i = 0; i < riders; i++)
+        {
+            if(i == 1){
+                p[i] = new ShuttleSynch(i, "shuttle");
+                p[i].start();
+            }
+            
+            else{
+                
+                p[i] = new ShuttleSynch(i, "rider");
+                p[i].start();
+                
+            }
+        }
+    }
+    
+}

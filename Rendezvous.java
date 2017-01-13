@@ -1,0 +1,79 @@
+/*
+ * CS350: HW7
+ *
+ * Rendezvous
+ *
+ * Author: Megan Horan(mrhoran@bu.edu)
+ * */
+import java.util.concurrent.Semaphore;
+
+
+class Rendezvous extends Thread
+{
+    private int id;
+    
+    static int N = 5;
+    
+    static int counter = 0;
+    
+    
+    static volatile Semaphore[] S2 = new Semaphore[N];
+    
+    public Rendezvous(int i)
+    {
+        id = i;
+    }
+
+    public void run()
+    {
+            try {
+                
+                for(int i = 0; i < 5; i++) {
+                    
+                    System.out.println("Process " + id  +" at the Rendezvous Point");
+                
+                    S2[id].release();
+                
+                    for(int j = 0; j < N; j++) {
+                       
+                            S2[j].acquire();
+                        
+                            S2[j].release();
+                            
+                        
+                    }
+                
+                    System.out.println("Leaving the Rendezvous Point");
+                
+                    S2[id].acquire();
+                    
+                    
+                    sleep((int) Math.random() * 1000);
+                
+                
+                }
+                
+                
+                //sleep((int) Math.random() * 1000);
+            } catch(InterruptedException e) {
+                System.out.println(e);
+            }
+        
+    }
+
+    public static void main(String[] args)
+    {
+        for(int j =0; j < N; j++){
+        
+            S2[j] = new Semaphore(0, false);
+        }
+    
+        Rendezvous[] p = new Rendezvous[N];
+ 
+        for (int i = 0; i < 5; i++)
+        {
+            p[i] = new Rendezvous(i);
+            p[i].start();
+        }
+    }
+}
