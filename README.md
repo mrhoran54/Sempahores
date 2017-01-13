@@ -2,8 +2,6 @@
 
 To simulate multiple processes, threads are used in conjunction with the semaphores in all the programs.
 
-My process Dekker: implements Dekkers algorithm
-
 N-batched Scan: This code ensures that no more than N many processes execute a critical section at a time.
 Priority Scan: gives those processes with higher priority access to the critical section first.
 
